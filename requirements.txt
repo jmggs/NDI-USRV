@@ -1,0 +1,25 @@
+# NDI Signal Generator — Python dependencies
+#
+# NDI SDK must be installed separately:
+#   Linux/macOS: https://ndi.video/for-developers/ndi-sdk/download/
+#   Then: pip install ndi-python
+#
+# ── Core ────────────────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9       # file uploads
+
+# ── Frame generation ─────────────────────────────────────────────────────────
+numpy>=1.26.0
+Pillow>=10.3.0
+
+# ── NDI SDK Python binding ───────────────────────────────────────────────────
+# Install only after NDI SDK is present on the system:
+# ndi-python>=0.1.2
+
+# ── Optional GPU (NVIDIA) ────────────────────────────────────────────────────
+# cupy-cuda12x>=13.0.0        # GPU arrays — match your CUDA version
+# opencv-python-headless>=4.9 # GPU-accelerated image ops
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+psutil>=5.9.0                 # system stats

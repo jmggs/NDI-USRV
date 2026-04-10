@@ -1,0 +1,39 @@
+[Unit]
+Description=NDI Signal Generator
+Documentation=https://github.com/your-org/ndi-generator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ndi
+Group=ndi
+WorkingDirectory=/opt/ndi-generator
+
+ExecStart=/opt/ndi-generator/venv/bin/python main.py \
+    --host 0.0.0.0 \
+    --port 8080
+
+Restart=always
+RestartSec=5
+StartLimitInterval=60
+StartLimitBurst=5
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+# Uncomment to enable mock mode (no NDI SDK required):
+# Environment=NDI_MOCK=1
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ndi-generator
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ndi-generator
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NDI Generator</title>
+<style>
+  :root {
+    --bg:       #0f0f0f;
+    --surface:  #1a1a1a;
+    --panel:    #222222;
+    --border:   #2e2e2e;
+    --accent:   #39ff6e;
+    --green:    #39ff6e;
+    --amber:    #c8a000;
+    --red:      #8b1a1a;
+    --red-text: #ff4444;
+    --text:     #cccccc;
+    --dim:      #555555;
+    --input-bg: #141414;
+    --radius:   4px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', 'DejaVu Sans Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ──────────────────────────────────────────────────────── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: bold; font-size: 15px;
+    letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent);
+  }
+  .logo-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent), 0 0 18px rgba(57,255,110,0.4);
+    animation: blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .header-right {
+    display: flex; align-items: center; gap: 18px;
+    font-size: 11px; color: var(--dim); letter-spacing: 1px;
+  }
+  .badge {
+    padding: 3px 8px; border-radius: 3px; font-size: 10px;
+    font-weight: bold; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .badge-gpu  { background:#0a1a0a; color:var(--accent); border:1px solid #1a3a1a; }
+  .badge-cpu  { background:#1a1a1a; color:var(--dim);    border:1px solid var(--border); }
+  .badge-mock { background:#1a1400; color:var(--amber);  border:1px solid #3a3000; }
+  #connStatus { font-size: 11px; letter-spacing: 1px; }
+
+  /* ── Main grid ───────────────────────────────────────────────────── */
+  main {
+    padding: 20px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    max-width: 1500px;
+    margin: 0 auto;
+  }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+
+  /* ── Channel card ────────────────────────────────────────────────── */
+  .channel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .channel.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 20px rgba(57,255,110,0.07);
+  }
+  .channel.ch-error { border-color: var(--red-text); }
+
+  /* ── Card header ─────────────────────────────────────────────────── */
+  .ch-header {
+    background: var(--panel);
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ch-num {
+    font-size: 10px; font-weight: bold; letter-spacing: 2px;
+    color: var(--dim); text-transform: uppercase; flex-shrink: 0;
+  }
+  .ch-name-input {
+    background: transparent; border: none; outline: none;
+    color: var(--text); font-family: inherit;
+    font-size: 13px; font-weight: bold; letter-spacing: 1px;
+    flex: 1; min-width: 0; text-transform: uppercase;
+  }
+  .ch-name-input:focus { color: var(--accent); }
+
+  .ch-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+  /* Status pill */
+  .status-pill {
+    padding: 2px 8px; border-radius: 3px; font-size: 10px;
+    font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase;
+    display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  .status-live {
+    background: #051a0d; color: var(--accent); border: 1px solid #1a4a28;
+  }
+  .status-live .status-dot {
+    background: var(--accent); box-shadow: 0 0 5px var(--accent);
+  }
+  .status-off {
+    background: #111; color: var(--dim); border: 1px solid var(--border);
+  }
+  .status-off .status-dot { background: var(--dim); }
+  .status-error {
+    background: #1a0505; color: var(--red-text); border: 1px solid #3a1010;
+  }
+  .status-error .status-dot { background: var(--red-text); }
+
+  /* Restart btn */
+  .btn-restart {
+    background: none; border: 1px solid var(--border);
+    color: var(--dim); border-radius: 3px;
+    padding: 3px 9px; font-size: 10px; font-family: inherit;
+    letter-spacing: 1px; cursor: pointer; text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .btn-restart:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Toggle */
+  .toggle { position: relative; width: 40px; height: 20px; cursor: pointer; flex-shrink:0; }
+  .toggle input { display: none; }
+  .toggle-track {
+    position: absolute; inset: 0;
+    background: var(--border); border-radius: 10px; transition: background 0.2s;
+  }
+  .toggle input:checked + .toggle-track { background: var(--accent); }
+  .toggle-thumb {
+    position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; transition: transform 0.2s;
+  }
+  .toggle input:checked ~ .toggle-thumb { transform: translateX(20px); }
+
+  /* ── Card body ───────────────────────────────────────────────────── */
+  .ch-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label {
+    font-size: 10px; font-weight: bold; color: var(--dim);
+    letter-spacing: 1.5px; text-transform: uppercase;
+  }
+
+  select, input[type=text] {
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    width: 100%; outline: none;
+    transition: border-color 0.15s;
+    letter-spacing: 0.5px;
+    appearance: none; -webkit-appearance: none;
+  }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23555'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+
+  /* Source grid */
+  .source-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .src-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 4px;
+    cursor: pointer;
+    text-align: center;
+    color: var(--dim);
+    font-size: 10px;
+    font-family: inherit;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 5px;
+    transition: all 0.12s;
+    user-select: none;
+  }
+  .src-btn .icon { font-size: 18px; }
+  .src-btn:hover { border-color: #444; color: var(--text); }
+  .src-btn.active {
+    background: #071a0e;
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: inset 0 0 12px rgba(57,255,110,0.05);
+  }
+
+  /* Field row */
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  /* Upload area */
+  .upload-area {
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    text-align: center;
+    color: var(--dim);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: none;
+  }
+  .upload-area:hover { border-color: var(--accent); color: var(--accent); }
+  .upload-area.visible { display: block; }
+  .upload-area.has-file { border-color: var(--accent); color: var(--accent); }
+  .upload-area input[type=file] { display: none; }
+
+  /* ── Stats bar ───────────────────────────────────────────────────── */
+  .ch-stats {
+    border-top: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex; gap: 24px; align-items: center;
+    background: var(--panel);
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-val {
+    font-size: 18px; font-weight: bold; color: var(--text);
+    font-variant-numeric: tabular-nums; letter-spacing: 0;
+  }
+  .stat-lbl {
+    font-size: 9px; color: var(--dim);
+    text-transform: uppercase; letter-spacing: 1.5px;
+  }
+  .stat-val.good { color: var(--accent); }
+  .stat-val.warn { color: var(--amber); }
+  .stat-val.bad  { color: var(--red-text); }
+
+  /* ── Toast ───────────────────────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 9px 18px;
+    font-size: 12px; font-family: inherit; letter-spacing: 1px;
+    color: var(--text); opacity: 0; transition: opacity 0.25s;
+    pointer-events: none; z-index: 999; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
+  #toast.ok  { border-color: var(--accent); color: var(--accent); }
+  #toast.err { border-color: var(--red-text); color: var(--red-text); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    NDI Signal Generator
+  </div>
+  <div class="header-right">
+    <span id="gpuBadge" class="badge badge-cpu">CPU</span>
+    <span id="mockBadge" style="display:none" class="badge badge-mock">MOCK</span>
+    <span id="connStatus" style="color:var(--dim)">⬤ connecting</span>
+  </div>
+</header>
+
+<main id="grid"></main>
+<div id="toast"></div>
+
+<script>
+const SOURCE_META = {
+  colorbars: { icon: '🟧', label: 'Colorbars' },
+  clock:     { icon: '🕐', label: 'Clock'    },
+  ltc:       { icon: '🎞', label: 'LTC TC'  },
+  image:     { icon: '🖼', label: 'Image'    },
+};
+
+let options  = { sources: [], resolutions: [], fps: [] };
+let channels = [];
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+async function init() {
+  options  = await fetch('/api/options').then(r => r.json());
+  channels = await fetch('/api/channels').then(r => r.json());
+  renderAll();
+
+  const sys = await fetch('/api/system').then(r=>r.json()).catch(()=>({}));
+  if (sys.gpu) {
+    const b = document.getElementById('gpuBadge');
+    b.textContent = 'GPU: ' + (sys.gpu_name || 'NVIDIA');
+    b.className = 'badge badge-gpu';
+  }
+
+  connectWS();
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────
+let ws, wsRetry = 1000;
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen = () => {
+    document.getElementById('connStatus').textContent = '⬤ live';
+    document.getElementById('connStatus').style.color = 'var(--accent)';
+    wsRetry = 1000;
+  };
+  ws.onmessage = e => { channels = JSON.parse(e.data); updateStats(); };
+  ws.onclose = () => {
+    document.getElementById('connStatus').textContent = '⬤ offline';
+    document.getElementById('connStatus').style.color = 'var(--red-text)';
+    setTimeout(connectWS, wsRetry = Math.min(wsRetry * 1.5, 10000));
+  };
+}
+setInterval(() => { if (ws?.readyState === 1) ws.send('ping'); }, 20000);
+
+// ── Render ────────────────────────────────────────────────────────────────
+function renderAll() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  channels.forEach(ch => grid.appendChild(buildCard(ch)));
+}
+
+function buildCard(ch) {
+  const id  = ch.id;
+  const div = document.createElement('div');
+  div.className = 'channel';
+  div.id = `ch-${id}`;
+
+  div.innerHTML = `
+    <div class="ch-header">
+      <span class="ch-num">CH ${id+1}</span>
+      <input class="ch-name-input" id="name-${id}"
+             value="${esc(ch.name)}" placeholder="CHANNEL NAME"
+             onchange="patchField(${id},'name',this.value)">
+      <div class="ch-controls">
+        <div id="pill-${id}" class="status-pill status-off">
+          <div class="status-dot"></div><span>OFFLINE</span>
+        </div>
+        <button class="btn-restart" onclick="restartCh(${id})">↺ RESET</button>
+        <label class="toggle" title="Enable">
+          <input type="checkbox" id="en-${id}" ${ch.enabled?'checked':''}
+                 onchange="patchField(${id},'enabled',this.checked)">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <div class="ch-body">
+      <div class="field">
+        <label>Source</label>
+        <div class="source-grid" id="sg-${id}">
+          ${options.sources.map(s=>`
+            <div class="src-btn ${ch.source===s?'active':''}"
+                 data-src="${s}" onclick="selectSrc(${id},'${s}')">
+              <span class="icon">${SOURCE_META[s]?.icon||'▣'}</span>
+              ${SOURCE_META[s]?.label||s}
+            </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="upload-area ${ch.source==='image'?'visible':''} ${ch.image_path?'has-file':''}"
+           id="ua-${id}" onclick="triggerUpload(${id})">
+        <input type="file" id="file-${id}" accept=".jpg,.jpeg,.png,.bmp"
+               onchange="uploadImg(${id},this)">
+        ${ch.image_path
+          ? `📁 ${ch.image_path.split('/').pop()} — click to change`
+          : '📤 Click to upload JPG / PNG'}
+      </div>
+
+      <div class="field">
+        <label>Label / Name overlay</label>
+        <input type="text" id="lbl-${id}" value="${esc(ch.label)}"
+               placeholder="Shown on clock / LTC output"
+               onchange="patchField(${id},'label',this.value)">
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Resolution</label>
+          <select id="res-${id}" onchange="patchField(${id},'resolution',this.value)">
+            ${options.resolutions.map(r=>`
+              <option value="${r}" ${ch.resolution===r?'selected':''}>${r}</option>
+            `).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label>Frame Rate</label>
+          <select id="fps-${id}" onchange="patchField(${id},'fps',this.value)">
+            ${options.fps.map(f=>`
+              <option value="${f}" ${ch.fps===f?'selected':''}>${f} fps</option>
+            `).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label>Acceleration</label>
+          <select id="gpu-${id}" onchange="patchField(${id},'use_gpu',this.value==='gpu')">
+            <option value="cpu" ${!ch.use_gpu?'selected':''}>CPU</option>
+            <option value="gpu" ${ch.use_gpu?'selected':''}>NVIDIA GPU</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="ch-stats">
+      <div class="stat">
+        <div class="stat-val" id="fps-v-${id}">—</div>
+        <div class="stat-lbl">Actual FPS</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="fr-${id}">0</div>
+        <div class="stat-lbl">Frames</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="dr-${id}">0</div>
+        <div class="stat-lbl">Drops</div>
+      </div>
+      <div class="stat" style="flex:1">
+        <div class="stat-val" id="err-${id}" style="font-size:10px;color:var(--dim)"></div>
+        <div class="stat-lbl">Status</div>
+      </div>
+    </div>`;
+
+  return div;
+}
+
+// ── Live stats ────────────────────────────────────────────────────────────
+function updateStats() {
+  channels.forEach(ch => {
+    const id   = ch.id;
+    const card = document.getElementById(`ch-${id}`);
+    if (!card) return;
+
+    const pill = document.getElementById(`pill-${id}`);
+    if (ch.error) {
+      pill.className = 'status-pill status-error';
+      pill.innerHTML = `<div class="status-dot"></div><span>ERROR</span>`;
+      card.className = 'channel ch-error';
+    } else if (ch.running && ch.enabled) {
+      pill.className = 'status-pill status-live';
+      pill.innerHTML = `<div class="status-dot"></div><span>LIVE</span>`;
+      card.className = 'channel active';
+    } else {
+      pill.className = 'status-pill status-off';
+      pill.innerHTML = `<div class="status-dot"></div><span>OFF</span>`;
+      card.className = 'channel';
+    }
+
+    const target = parseFloat(ch.fps) || 25;
+    const actual = ch.actual_fps || 0;
+    const fv = document.getElementById(`fps-v-${id}`);
+    if (fv) {
+      fv.textContent = actual.toFixed(1);
+      fv.className = 'stat-val ' +
+        (actual >= target*0.98 ? 'good' : actual >= target*0.90 ? 'warn' : 'bad');
+    }
+    const fr = document.getElementById(`fr-${id}`);
+    if (fr) fr.textContent = ch.frame_count.toLocaleString();
+    const dr = document.getElementById(`dr-${id}`);
+    if (dr) { dr.textContent = ch.drop_count;
+      dr.className = 'stat-val ' + (ch.drop_count > 0 ? 'warn' : ''); }
+    const er = document.getElementById(`err-${id}`);
+    if (er) er.textContent = ch.error || (ch.running ? 'OK' : 'stopped');
+  });
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────
+function selectSrc(id, src) {
+  document.getElementById(`sg-${id}`)
+    .querySelectorAll('.src-btn')
+    .forEach(b => b.classList.toggle('active', b.dataset.src === src));
+  const ua = document.getElementById(`ua-${id}`);
+  if (ua) ua.classList.toggle('visible', src === 'image');
+  patchField(id, 'source', src);
+}
+
+async function patchField(id, key, val) {
+  try {
+    const r = await fetch(`/api/channels/${id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({[key]: val}),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    toast('SAVED', 'ok');
+  } catch(e) { toast('ERROR: ' + e.message, 'err'); }
+}
+
+async function restartCh(id) {
+  try {
+    await fetch(`/api/channels/${id}/restart`, {method:'POST'});
+    toast(`CH ${id+1} RESTARTING`, 'ok');
+  } catch(e) { toast('ERROR: ' + e.message, 'err'); }
+}
+
+function triggerUpload(id) { document.getElementById(`file-${id}`).click(); }
+
+async function uploadImg(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const r = await fetch(`/api/channels/${id}/upload`, {method:'POST', body:form});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Upload failed');
+    const ua = document.getElementById(`ua-${id}`);
+    if (ua) {
+      ua.classList.add('has-file');
+      ua.innerHTML = `<input type="file" id="file-${id}" accept=".jpg,.jpeg,.png,.bmp"
+        onchange="uploadImg(${id},this)">📁 ${file.name} — click to change`;
+    }
+    toast(`IMAGE LOADED — CH ${id+1}`, 'ok');
+  } catch(e) { toast('UPLOAD ERROR: ' + e.message, 'err'); }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/[&<>"']/g,
+    c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+let _tt;
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `show ${type}`;
+  clearTimeout(_tt); _tt = setTimeout(() => el.className = '', 2500);
+}
+
+init().catch(e => {
+  document.getElementById('grid').innerHTML =
+    `<p style="color:var(--red-text);padding:40px;font-family:monospace">
+     BOOT ERROR: ${e}</p>`;
+});
+</script>
+</body>
+</html>

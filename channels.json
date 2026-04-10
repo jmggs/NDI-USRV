@@ -1,0 +1,48 @@
+{
+  "channels": [
+    {
+      "id": 0,
+      "name": "NDI Channel 1",
+      "enabled": true,
+      "source": "colorbars",
+      "resolution": "1080p",
+      "fps": "25",
+      "image_path": "",
+      "label": "NDI Channel 1",
+      "use_gpu": false
+    },
+    {
+      "id": 1,
+      "name": "NDI Channel 2",
+      "enabled": true,
+      "source": "clock",
+      "resolution": "UHD",
+      "fps": "25",
+      "image_path": "",
+      "label": "NDI Channel 2",
+      "use_gpu": false
+    },
+    {
+      "id": 2,
+      "name": "NDI Channel 3",
+      "enabled": true,
+      "source": "image",
+      "resolution": "1080p",
+      "fps": "25",
+      "image_path": "uploads/ch2.jpg",
+      "label": "NDI Channel 3",
+      "use_gpu": false
+    },
+    {
+      "id": 3,
+      "name": "NDI Channel 4",
+      "enabled": true,
+      "source": "ltc",
+      "resolution": "1080p",
+      "fps": "25",
+      "image_path": "",
+      "label": "NDI Channel 4",
+      "use_gpu": false
+    }
+  ]
+}
